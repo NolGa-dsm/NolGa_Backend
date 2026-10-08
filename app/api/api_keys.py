@@ -1,15 +1,15 @@
 from datetime import timedelta
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Header, status
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.config import settings
 from app.database import get_db
-from app.deps import get_current_user_or_api_key
+from app.deps import get_current_user_or_api_key, invalid_credentials
 from app.models import ApiKey, User
-from app.schemas import ApiKeyCreate, ApiKeyCreated, ApiKeyOut
-from app.security import generate_api_key, utcnow
+from app.schemas import ApiKeyCreate, ApiKeyCreated, ApiKeyOut, ApiKeyVerifyResponse
+from app.security import as_utc, generate_api_key, hash_token, utcnow
 
 router = APIRouter(prefix="/api-keys", tags=["api-keys"])
 
@@ -63,3 +63,30 @@ def revoke_api_key(
     if record.revoked_at is None:
         record.revoked_at = utcnow()
         db.commit()
+@router.get("/verify", response_model=ApiKeyVerifyResponse)
+def verify_api_key(
+    x_api_key: str | None = Header(default=None, alias="X-API-Key"),
+    db: Session = Depends(get_db),
+) -> ApiKeyVerifyResponse:
+    if not x_api_key:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="X-API-Key header required")
+
+    parts = x_api_key.split("_")
+    if len(parts) != 3 or parts[0] != settings.API_KEY_PREFIX:
+        raise invalid_credentials
+
+    record = db.scalar(select(ApiKey).where(ApiKey.key_prefix == parts[1]))
+    if record is None or record.key_hash != hash_token(x_api_key):
+        raise invalid_credentials
+
+    if record.revoked_at is not None:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="API key revoked")
+    if as_utc(record.expires_at) < utcnow():
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="API key expired")
+    if record.user is None or not record.user.is_active:
+        raise invalid_credentials
+
+    return ApiKeyVerifyResponse(
+        valid=True,
+        api_key_id=record.id,
+    )
