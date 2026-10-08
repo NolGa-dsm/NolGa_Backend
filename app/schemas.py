@@ -43,3 +43,7 @@ class ApiKeyOut(BaseModel):
 
 class ApiKeyCreated(ApiKeyOut):
     api_key: str
+
+class ApiKeyVerifyResponse(BaseModel):
+    valid: bool
+    api_key_id: int
