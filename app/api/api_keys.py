@@ -1,6 +1,7 @@
 from datetime import timedelta
 
-from fastapi import APIRouter, Depends, HTTPException, Header, status
+from fastapi import APIRouter, Depends, HTTPException, Request, status
+from fastapi.security import APIKeyHeader
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
@@ -12,6 +13,7 @@ from app.schemas import ApiKeyCreate, ApiKeyCreated, ApiKeyOut, ApiKeyVerifyResp
 from app.security import as_utc, generate_api_key, hash_token, utcnow
 
 router = APIRouter(prefix="/api-keys", tags=["api-keys"])
+api_key_header = APIKeyHeader(name="X-API-Key", auto_error=False)
 
 
 def _get_owned_key(db: Session, api_key_id: int, user: User) -> ApiKey:
@@ -63,30 +65,45 @@ def revoke_api_key(
     if record.revoked_at is None:
         record.revoked_at = utcnow()
         db.commit()
+
+
+
 @router.get("/verify", response_model=ApiKeyVerifyResponse)
 def verify_api_key(
-    x_api_key: str | None = Header(default=None, alias="X-API-Key"),
+    api_key: str | None = Depends(api_key_header),
     db: Session = Depends(get_db),
 ) -> ApiKeyVerifyResponse:
-    if not x_api_key:
+    if not api_key:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="X-API-Key header required")
-
-    parts = x_api_key.split("_")
+    parts = api_key.split("_")
     if len(parts) != 3 or parts[0] != settings.API_KEY_PREFIX:
         raise invalid_credentials
-
     record = db.scalar(select(ApiKey).where(ApiKey.key_prefix == parts[1]))
-    if record is None or record.key_hash != hash_token(x_api_key):
+    if record is None or record.key_hash != hash_token(api_key):
         raise invalid_credentials
-
     if record.revoked_at is not None:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="API key revoked")
     if as_utc(record.expires_at) < utcnow():
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="API key expired")
     if record.user is None or not record.user.is_active:
         raise invalid_credentials
+    return ApiKeyVerifyResponse(valid=True, api_key_id=record.id)
 
-    return ApiKeyVerifyResponse(
-        valid=True,
-        api_key_id=record.id,
-    )
+@router.get("/verify-key")
+def verify_key(request: Request, db: Session = Depends(get_db)):
+    key = request.headers.get("x-api-key") or request.headers.get("X-API-Key")
+    if not key:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="X-API-Key header required")
+    parts = key.split("_")
+    if len(parts) != 3 or parts[0] != settings.API_KEY_PREFIX:
+        raise invalid_credentials
+    record = db.scalar(select(ApiKey).where(ApiKey.key_prefix == parts[1]))
+    if record is None or record.key_hash != hash_token(key):
+        raise invalid_credentials
+    if record.revoked_at is not None:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="API key revoked")
+    if as_utc(record.expires_at) < utcnow():
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="API key expired")
+    if record.user is None or not record.user.is_active:
+        raise invalid_credentials
+    return ApiKeyVerifyResponse(valid=True, api_key_id=record.id)
