@@ -5,27 +5,47 @@ from sqlalchemy.orm import Session, selectinload
 from app.database import get_db
 from app.deps import get_current_user_or_api_key
 from app.models import Works
-from app.schemas import WorkDetailResponse, WorkResponse, WorkSummaryUpdate
+from app.schemas import (
+    WorkDetailResponse,
+    WorkResponse,
+    WorkSummaryUpdate,
+)
+
 
 router = APIRouter(
     prefix="/api/works",
     tags=["works"],
-    dependencies=[Depends(get_current_user_or_api_key)],  # 인증 필수 (JWT 또는 X-API-Key)
+    dependencies=[Depends(get_current_user_or_api_key)],
 )
 
 STATUS_EDITED = "edited"
-_MAX_ID = 2**63 - 1  # DB 정수 범위를 넘는 id는 "없는 id"로 취급
+VALID_STATUSES = {"auto", "review", "edited"}
 
+_MAX_ID = 2**63 - 1
+_MAX_ID_STR = str(_MAX_ID)
 
 def _get_work(db: Session, work_id: str) -> Works:
-    # 프론트는 id를 문자열로 다룬다. 숫자가 아니거나 존재하지 않으면 모두 404.
     record = None
-    if work_id.isascii() and work_id.isdigit() and int(work_id) <= _MAX_ID:
-        record = db.scalar(
-            select(Works)
-            .where(Works.id == int(work_id))
-            .options(selectinload(Works.changes), selectinload(Works.sources))
-        )
+
+    if work_id.isascii() and work_id.isdigit():
+        normalized_id = work_id.lstrip("0") or "0"
+
+        # DB 정수 범위를 초과하는 ID 방지
+        if (
+            len(normalized_id) < len(_MAX_ID_STR)
+            or (
+                len(normalized_id) == len(_MAX_ID_STR)
+                and normalized_id <= _MAX_ID_STR
+            )
+        ):
+            record = db.scalar(
+                select(Works)
+                .where(Works.id == int(normalized_id))
+                .options(
+                    selectinload(Works.changes),
+                    selectinload(Works.sources),
+                )
+            )
     if record is None:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
@@ -33,31 +53,45 @@ def _get_work(db: Session, work_id: str) -> Works:
         )
     return record
 
-
 @router.get(
     "",
     response_model=list[WorkResponse],
     summary="작업 목록 조회",
-    description=(
-        "조건에 맞는 작업 목록을 최신순(createdAt 내림차순)으로 페이징하여 조회합니다. "
-        "필터 적용 후의 전체 개수는 `X-Total-Count` 응답 헤더로 내려갑니다."
-    ),
+    description="조건에 맞는 작업 목록을 최신순으로 페이징하여 조회합니다.",
 )
 def read_works(
     response: Response,
     page: int = Query(1, ge=1, description="페이지 번호"),
     size: int = Query(10, ge=1, le=100, description="페이지당 개수"),
-    repository: str | None = Query(None, description="저장소 필터 (예: nolga/api-server)"),
-    q: str | None = Query(None, description="제목/요약 검색 키워드"),
-    status_filter: str | None = Query(None, alias="status", description="상태 필터 (auto | review | edited)"),
-    author: str | None = Query(None, description="작성자 필터"),
+    repository: str | None = Query(
+        None,
+        description="저장소 필터",
+    ),
+    q: str | None = Query(
+        None,
+        description="제목/요약 검색 키워드",
+    ),
+    status_filter: str | None = Query(
+        None,
+        alias="status",
+        description="상태 필터 (auto | review | edited)",
+    ),
+    author: str | None = Query(
+        None,
+        description="작성자 필터",
+    ),
     db: Session = Depends(get_db),
 ):
+    if status_filter is not None and status_filter not in VALID_STATUSES:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Invalid status. Allowed values: auto, review, edited",
+        )
+
     skip = (page - 1) * size
 
     stmt = select(Works)
 
-    # 필터링 조건
     if repository:
         stmt = stmt.where(Works.repository == repository)
     if status_filter:
@@ -73,21 +107,58 @@ def read_works(
             )
         )
 
-    # 전체 개수 집계
+    # 필터 적용 후 전체 개수
     count_stmt = select(func.count()).select_from(stmt.subquery())
     total = db.scalar(count_stmt) or 0
     response.headers["X-Total-Count"] = str(total)
 
-    # 페이징 및 정렬 (최신순, 같은 날짜는 id 내림차순으로 순서 고정)
-    stmt = stmt.order_by(Works.created_at.desc(), Works.id.desc()).offset(skip).limit(size)
+    # 최신순 정렬 및 페이지네이션
+    stmt = (
+        stmt
+        .order_by(
+            Works.created_at.desc(),
+            Works.id.desc(),
+        )
+        .offset(skip)
+        .limit(size)
+    )
+
     return list(db.scalars(stmt).all())
 
+@router.get(
+    "/me",
+    response_model=list[WorkResponse],
+    summary="내 작업 목록 조회",
+    description="로그인한 사용자가 작성한 작업 목록을 최신순으로 조회합니다.",
+)
+def read_my_works(
+    current_user=Depends(get_current_user_or_api_key),
+    db: Session = Depends(get_db),
+):
+    username = getattr(current_user, "username", None)
+
+    if not username:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="User authentication is required",
+        )
+
+    stmt = (
+        select(Works)
+        .where(Works.author == username)
+        .order_by(
+            Works.created_at.desc(),
+            Works.id.desc(),
+        )
+    )
+
+    return list(db.scalars(stmt).all())
 
 @router.get(
     "/{work_id}",
     response_model=WorkDetailResponse,
     summary="작업 상세 조회",
-    description="특정 ID의 작업 상세 정보를 조회합니다. 없는 id는 404를 반환합니다.",
+    description="특정 ID의 작업 상세 정보를 조회합니다.",
 )
 def read_work(
     work_id: str,
@@ -95,12 +166,11 @@ def read_work(
 ):
     return _get_work(db, work_id=work_id)
 
-
 @router.patch(
     "/{work_id}",
     response_model=WorkDetailResponse,
     summary="작업 요약 수정",
-    description="요약을 수정하고 status를 `edited`로 변경한 뒤, 수정된 작업 상세를 반환합니다.",
+    description="요약을 수정하고 status를 edited로 변경합니다.",
 )
 def update_work_summary(
     work_id: str,
@@ -117,5 +187,6 @@ def update_work_summary(
     record.summary = body.summary
     record.status = STATUS_EDITED
     db.commit()
-    db.refresh(record)
-    return record
+
+    # 관계 데이터까지 포함하여 상세 정보 재조회
+    return _get_work(db, work_id=work_id)
