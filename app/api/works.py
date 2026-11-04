@@ -94,7 +94,16 @@ def read_works(
     if status_filter is not None and status_filter not in VALID_STATUSES:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Invalid status. Allowed values: auto, review, edited",
+            detail="Invalid status. Allowed values: [auto, review, edited]",
+        )
+    if (
+        created_from is not None
+        and created_to is not None
+        and created_from > created_to
+    ):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="created_from must be before or equal to created_to",
         )
 
     stmt = select(Works)
