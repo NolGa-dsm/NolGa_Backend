@@ -60,7 +60,7 @@ class WorkResponse(BaseModel):
     repository: str | None = None
     author: str
     created_at: date = Field(..., alias="createdAt")
-    status: str  # auto | review | edited
+    status: Literal["auto", "review", "edited"]  # auto | review | edited
 
     model_config = ConfigDict(
         from_attributes=True,   # ORM 객체를 Pydantic 모델로 직접 변환
@@ -118,12 +118,13 @@ class WorkDetailResponse(WorkResponse):
     branch: str | None = None
     request: str | None = None
     style_name: str | None = Field(None, alias="styleName")
+    url: str | None = None
     changes: list[WorkChangeOut] = Field(default_factory=list)
     sources: list[WorkSourceOut] = Field(default_factory=list)
 
     @model_serializer(mode="wrap")
     def _serialize(self, handler: Any) -> dict[str, Any]:
-        return _omit_none(handler(self), "branch", "request", "styleName", "style_name")
+        return _omit_none(handler(self), "branch", "request", "styleName", "style_name", "url")
 
 
 # 요약 수정 요청
