@@ -70,6 +70,7 @@ class Works(Base):
     branch: Mapped[str | None] = mapped_column(String(255), nullable=True)
     request: Mapped[str | None] = mapped_column(Text, nullable=True)
     style_name: Mapped[str | None] = mapped_column(String(100), nullable=True)
+    url: Mapped[str | None] = mapped_column(String(2000), nullable=True)
 
     changes: Mapped[list["WorkChange"]] = relationship(
         back_populates="work", cascade="all, delete-orphan", order_by="WorkChange.id"
