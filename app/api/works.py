@@ -1,6 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException, Query, Response, status
 from sqlalchemy import func, or_, select
 from sqlalchemy.orm import Session, selectinload
+from datetime import date, datetime, time, timedelta
 
 from app.database import get_db
 from app.deps import get_current_user_or_api_key
@@ -69,7 +70,7 @@ def read_works(
     ),
     q: str | None = Query(
         None,
-        description="제목/요약 검색 키워드",
+        description="제목/요약/저장소 검색 키워드",
     ),
     status_filter: str | None = Query(
         None,
@@ -79,6 +80,14 @@ def read_works(
     author: str | None = Query(
         None,
         description="작성자 필터",
+    ),
+    created_from: date | None = Query(
+        None,
+        description="작업 생성 시작 날짜 (YYYY-MM-DD)",
+    ),
+    created_to: date | None = Query(
+        None,
+        description="작업 생성 종료 날짜 (YYYY-MM-DD)",
     ),
     db: Session = Depends(get_db),
 ):
@@ -90,6 +99,16 @@ def read_works(
 
     stmt = select(Works)
 
+    if created_from:
+        start_datetime = datetime.combine(created_from, time.min)
+        stmt = stmt.where(Works.created_at >= start_datetime)
+
+    if created_to:
+        end_datetime = datetime.combine(
+            created_to + timedelta(days=1),
+            time.min,
+        )
+        stmt = stmt.where(Works.created_at < end_datetime)
     if repository:
         stmt = stmt.where(Works.repository == repository)
     if status_filter:
@@ -102,6 +121,7 @@ def read_works(
             or_(
                 Works.title.icontains(keyword, autoescape=True),
                 Works.summary.icontains(keyword, autoescape=True),
+                Works.repository.icontains(keyword, autoescape=True),
             )
         )
 
