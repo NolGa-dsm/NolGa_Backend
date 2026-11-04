@@ -111,18 +111,14 @@ def read_works(
     response.headers["X-Total-Count"] = str(total)
 
     # 최신순 정렬 및 페이지네이션
-    if page!=None and size!=None:
-        skip = (page - 1) * size
+    stmt = stmt.order_by(
+        Works.created_at.desc(),
+        Works.id.desc(),
+    )
 
-        stmt = (
-            stmt
-            .order_by(
-                Works.created_at.desc(),
-                Works.id.desc(),
-            )
-            .offset(skip)
-            .limit(size)
-        )
+    if page is not None and size is not None:
+        skip = (page - 1) * size
+        stmt = stmt.offset(skip).limit(size)
 
     return list(db.scalars(stmt).all())
 
