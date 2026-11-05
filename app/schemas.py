@@ -151,6 +151,8 @@ class WorkCreateRequest(BaseModel):
     style_name: str | None = Field(None, alias="styleName")
     url: str | None = None
 
+    status: Literal["auto", "review", "edited"]
+    
     changes: list[WorkChangeCreate] = Field(default_factory=list)
     sources: list[WorkSourceCreate] = Field(default_factory=list)
 
