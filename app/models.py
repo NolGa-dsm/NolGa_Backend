@@ -1,5 +1,5 @@
 from datetime import datetime, timezone
-from sqlalchemy import Boolean, DateTime, ForeignKey, String, Text, func
+from sqlalchemy import Boolean, DateTime, ForeignKey, String, Text, func, CheckConstraint
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.database import Base
@@ -57,7 +57,12 @@ class ApiKey(Base):
 
 class Works(Base):
     __tablename__ = "works"
-
+    __table_args__ = (
+        CheckConstraint(
+            "status IN ('auto', 'review', 'edited')",
+            name="ck_works_status",
+        ),
+    )
     id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
     title: Mapped[str] = mapped_column(String(255))
     summary: Mapped[str | None] = mapped_column(String, nullable=True)
