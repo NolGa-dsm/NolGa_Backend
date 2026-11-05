@@ -5,11 +5,13 @@ from datetime import date, datetime, time, timedelta
 
 from app.database import get_db
 from app.deps import get_current_user_or_api_key
-from app.models import Works
+from app.models import Works, WorkChange, WorkSource, utcnow
+
 from app.schemas import (
     WorkDetailResponse,
     WorkResponse,
     WorkSummaryUpdate,
+    WorkCreateRequest,
 )
 
 
@@ -53,6 +55,68 @@ def _get_work(db: Session, work_id: str) -> Works:
             detail=f"Work with ID {work_id} not found",
         )
     return record
+
+@router.post(
+    "",
+    response_model=WorkDetailResponse,
+    status_code=status.HTTP_201_CREATED,
+    summary="작업 생성",
+    description="새로운 작업과 변경사항 및 관련 자료를 생성합니다.",
+)
+def create_work(
+    body: WorkCreateRequest,
+    current_user=Depends(get_current_user_or_api_key),
+    db: Session = Depends(get_db),
+):
+    # 1. 작업 기본 정보 생성
+    work = Works(
+        title=body.title,
+        summary=body.summary,
+        repository=body.repository,
+
+        # 인증된 사용자 정보 사용
+        author=current_user.username,
+
+        # 서버에서 생성 시간 설정
+        created_at=utcnow(),
+
+        # 자동 생성 작업의 기본 상태
+        status="auto",
+
+        # 상세 정보
+        branch=body.branch,
+        request=body.request,
+        style_name=body.style_name,
+        url=body.url,
+    )
+
+    # 2. 변경사항 추가
+    work.changes = [
+        WorkChange(
+            path=change.path,
+            type=change.type,
+            additions=change.additions,
+            deletions=change.deletions,
+        )
+        for change in body.changes
+    ]
+
+    # 3. 관련 자료 추가
+    work.sources = [
+        WorkSource(
+            type=source.type,
+            title=source.title,
+            url=source.url,
+        )
+        for source in body.sources
+    ]
+
+    # 4. DB 저장
+    db.add(work)
+    db.commit()
+
+    # 5. 생성된 작업의 ID를 포함한 상세 정보 반환
+    return _get_work(db, str(work.id))
 
 @router.get(
     "",

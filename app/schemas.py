@@ -126,6 +126,37 @@ class WorkDetailResponse(WorkResponse):
     def _serialize(self, handler: Any) -> dict[str, Any]:
         return _omit_none(handler(self), "branch", "request", "styleName", "style_name", "url")
 
+# Work 생성 요청 스키마
+
+class WorkChangeCreate(BaseModel):
+    path: str
+    type: Literal["added", "modified", "deleted"]
+    additions: int = 0
+    deletions: int = 0
+
+
+class WorkSourceCreate(BaseModel):
+    type: Literal["commit", "issue", "file", "note"]
+    title: str
+    url: str | None = None
+
+
+class WorkCreateRequest(BaseModel):
+    title: str = Field(min_length=1, max_length=255)
+    summary: str = Field(min_length=1)
+    repository: str | None = None
+
+    branch: str | None = None
+    request: str | None = None
+    style_name: str | None = Field(None, alias="styleName")
+    url: str | None = None
+
+    changes: list[WorkChangeCreate] = Field(default_factory=list)
+    sources: list[WorkSourceCreate] = Field(default_factory=list)
+
+    model_config = ConfigDict(
+        populate_by_name=True
+    )
 
 # 요약 수정 요청
 class WorkSummaryUpdate(BaseModel):
