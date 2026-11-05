@@ -108,3 +108,26 @@ class WorkSource(Base):
     url: Mapped[str | None] = mapped_column(String(2000), nullable=True)
 
     work: Mapped[Works] = relationship(back_populates="sources")
+
+# Notification관련
+class Notification(Base):
+    __tablename__ = "notifications"
+
+    id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
+    user_id: Mapped[int] = mapped_column(
+        ForeignKey("users.id", ondelete="CASCADE"),
+        index=True,
+    )
+    work_id: Mapped[int] = mapped_column(
+        ForeignKey("works.id", ondelete="CASCADE"),
+        index=True,
+    )
+    is_read: Mapped[bool] = mapped_column(
+        Boolean,
+        default=False,
+        nullable=False,
+    )
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+    )

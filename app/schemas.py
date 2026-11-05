@@ -130,3 +130,13 @@ class WorkDetailResponse(WorkResponse):
 # 요약 수정 요청
 class WorkSummaryUpdate(BaseModel):
     summary: str
+
+# Notification 응답
+class NotificationResponse(BaseModel):
+    id: int
+    work_id: str = Field(alias="workId")
+    work_title: str = Field(alias="workTitle")
+    is_read: bool = Field(alias="isRead")
+    created_at: datetime = Field(alias="createdAt")
+
+    model_config = ConfigDict(populate_by_name=True)
