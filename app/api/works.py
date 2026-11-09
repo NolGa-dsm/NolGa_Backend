@@ -87,7 +87,6 @@ def create_work(
         branch=body.branch,
         request=body.request,
         style_name=body.style_name,
-        url=body.url,
     )
 
     # 2. 변경사항 추가
@@ -106,7 +105,6 @@ def create_work(
         WorkSource(
             type=source.type,
             title=source.title,
-            url=source.url,
         )
         for source in body.sources
     ]
