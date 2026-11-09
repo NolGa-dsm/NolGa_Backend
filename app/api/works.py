@@ -81,7 +81,7 @@ def create_work(
         created_at=utcnow(),
 
         # 자동 생성 작업의 기본 상태
-        status="auto",
+        status=body.status,
 
         # 상세 정보
         branch=body.branch,
