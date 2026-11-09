@@ -101,7 +101,6 @@ class WorkSourceOut(BaseModel):
     id: str
     type: Literal["commit", "issue", "file", "note"]
     title: str
-    url: str | None = None
 
     @field_validator("id", mode="before")
     @classmethod
@@ -110,7 +109,7 @@ class WorkSourceOut(BaseModel):
 
     @model_serializer(mode="wrap")
     def _serialize(self, handler: Any) -> dict[str, Any]:
-        return _omit_none(handler(self), "url")
+        return _omit_none(handler(self))
 
 
 # 작업 상세 응답 (목록 필드 + 상세 필드)
@@ -118,13 +117,12 @@ class WorkDetailResponse(WorkResponse):
     branch: str | None = None
     request: str | None = None
     style_name: str | None = Field(None, alias="styleName")
-    url: str | None = None
     changes: list[WorkChangeOut] = Field(default_factory=list)
     sources: list[WorkSourceOut] = Field(default_factory=list)
 
     @model_serializer(mode="wrap")
     def _serialize(self, handler: Any) -> dict[str, Any]:
-        return _omit_none(handler(self), "branch", "request", "styleName", "style_name", "url")
+        return _omit_none(handler(self), "branch", "request", "styleName", "style_name")
 
 # Work 생성 요청 스키마
 
@@ -138,7 +136,6 @@ class WorkChangeCreate(BaseModel):
 class WorkSourceCreate(BaseModel):
     type: Literal["commit", "issue", "file", "note"]
     title: str
-    url: str | None = None
 
 
 class WorkCreateRequest(BaseModel):
@@ -149,7 +146,6 @@ class WorkCreateRequest(BaseModel):
     branch: str | None = None
     request: str | None = None
     style_name: str | None = Field(None, alias="styleName")
-    url: str | None = None
 
     status: Literal["auto", "review", "edited"]
     
