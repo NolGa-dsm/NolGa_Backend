@@ -65,7 +65,7 @@ class Works(Base):
     )
     id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
     title: Mapped[str] = mapped_column(String(255))
-    summary: Mapped[str | None] = mapped_column(String, nullable=True)
+    summary: Mapped[str | None] = mapped_column(String(255), nullable=True)
     repository: Mapped[str | None] = mapped_column(String(255), nullable=True)
     author: Mapped[str] = mapped_column(String(100))
     created_at: Mapped[DateTime] = mapped_column("createdAt", DateTime)
@@ -129,3 +129,5 @@ class Notification(Base):
         DateTime(timezone=True),
         server_default=func.now(),
     )
+    title: Mapped[str] = mapped_column(String(255))
+    message: Mapped[str] = mapped_column(Text)
