@@ -29,27 +29,11 @@ class Settings(BaseSettings):
     
     @property
     def DATABASE_URL(self) -> URL:
-        # jdbc:mysql:// 접두사 제거
-        raw_url = self.RAW_DB_URL.removeprefix("jdbc:mysql://")
+        raw_url = self.RAW_DB_URL.removeprefix("jdbc:mysql://").strip()
 
-        # 호스트, 포트, 데이터베이스 분리
         host_port, database = raw_url.split("/", 1)
         host, port = host_port.rsplit(":", 1)
 
-        print("DB HOST:", repr(host))
-        print("DB PORT:", repr(port))
-        print("DB NAME:", repr(database))
-
-        
-        print("URL", repr(URL.create(
-            drivername="mysql+pymysql",
-            username=self.DB_USER,
-            password=self.DB_PASSWORD,
-            host=host,
-            port=int(port),
-            database=database
-        )))
-        
         return URL.create(
             drivername="mysql+pymysql",
             username=self.DB_USER,
