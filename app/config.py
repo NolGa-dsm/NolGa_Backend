@@ -36,6 +36,10 @@ class Settings(BaseSettings):
         host_port, database = raw_url.split("/", 1)
         host, port = host_port.rsplit(":", 1)
 
+        print("DB HOST:", repr(host))
+        print("DB PORT:", repr(port))
+        print("DB NAME:", repr(database))
+
         return URL.create(
             drivername="mysql+pymysql",
             username=self.DB_USER,
