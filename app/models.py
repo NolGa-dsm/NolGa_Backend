@@ -65,7 +65,7 @@ class Works(Base):
     )
     id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
     title: Mapped[str] = mapped_column(String(255))
-    summary: Mapped[str | None] = mapped_column(String, nullable=True)
+    summary: Mapped[str | None] = mapped_column(String(255), nullable=True)
     repository: Mapped[str | None] = mapped_column(String(255), nullable=True)
     author: Mapped[str] = mapped_column(String(100))
     created_at: Mapped[DateTime] = mapped_column("createdAt", DateTime)
@@ -106,3 +106,28 @@ class WorkSource(Base):
     title: Mapped[str] = mapped_column(String(500))
 
     work: Mapped[Works] = relationship(back_populates="sources")
+
+# Notification관련
+class Notification(Base):
+    __tablename__ = "notifications"
+
+    id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
+    user_id: Mapped[int] = mapped_column(
+        ForeignKey("users.id", ondelete="CASCADE"),
+        index=True,
+    )
+    work_id: Mapped[int] = mapped_column(
+        ForeignKey("works.id", ondelete="CASCADE"),
+        index=True,
+    )
+    is_read: Mapped[bool] = mapped_column(
+        Boolean,
+        default=False,
+        nullable=False,
+    )
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+    )
+    title: Mapped[str] = mapped_column(String(255))
+    message: Mapped[str] = mapped_column(Text)
