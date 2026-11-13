@@ -163,7 +163,7 @@ class WorkSummaryUpdate(BaseModel):
 # Notification 응답
 class NotificationResponse(BaseModel):
     id: int
-    work_id: int | None = None
+    work_id: str = Field(alias="workId")
     work_title: str = Field(alias="workTitle")
     is_read: bool = Field(alias="isRead")
     created_at: datetime = Field(alias="createdAt")
@@ -181,3 +181,26 @@ class UnreadCountResponse(BaseModel):
 class ReadAllResponse(BaseModel):
     updated_count: int = Field(alias="updatedCount")
     model_config = ConfigDict(populate_by_name=True)
+
+class NotificationCreateRequest(BaseModel):
+    work_id: int
+
+
+class NotificationItemResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True, populate_by_name=True)
+
+    id: int
+    work_id: str
+    work_title: str
+    title: str
+    message: str
+    is_read: bool
+    created_at: datetime
+
+
+class NotificationUnreadCountResponse(BaseModel):
+    unread_count: int
+
+
+class NotificationReadAllResponse(BaseModel):
+    updated_count: int
