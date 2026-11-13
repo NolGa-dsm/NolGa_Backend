@@ -1,12 +1,19 @@
+
 from pydantic_settings import BaseSettings, SettingsConfigDict
 from pydantic import Field
+from sqlalchemy.engine import URL
+
 
 class Settings(BaseSettings):
-    model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8", extra="ignore")
+    model_config = SettingsConfigDict(
+        env_file=".env",
+        env_file_encoding="utf-8",
+        extra="ignore"
+    )
 
-    RAW_DB_URL: str = Field(alias="DB_URL")          # jdbc:mysql://localhost:4272/myapp_db
-    DB_USER: str = Field(alias="DB_USERNAME")        # .env의 실제 아이디 변수명
-    DB_PASSWORD: str = Field(alias="DB_PASSWORD")    # .env의 실제 비밀번호 변수명
+    RAW_DB_URL: str = Field(alias="DB_URL")
+    DB_USER: str = Field(alias="DB_USERNAME")
+    DB_PASSWORD: str = Field(alias="DB_PASSWORD")
 
     SECRET_KEY: str = "change-me-to-a-long-random-string"
     ALGORITHM: str = "HS256"
@@ -21,9 +28,22 @@ class Settings(BaseSettings):
     API_KEY_PREFIX: str = "nlk"
     
     @property
-    def DATABASE_URL(self) -> str:
-        host_and_db = self.RAW_DB_URL.replace("jdbc:mysql://", "")
-        return f"mysql+pymysql://{self.DB_USER}:{self.DB_PASSWORD}@{host_and_db}"
+    def DATABASE_URL(self) -> URL:
+        # jdbc:mysql:// 접두사 제거
+        raw_url = self.RAW_DB_URL.removeprefix("jdbc:mysql://")
+
+        # 호스트, 포트, 데이터베이스 분리
+        host_port, database = raw_url.split("/", 1)
+        host, port = host_port.rsplit(":", 1)
+
+        return URL.create(
+            drivername="mysql+pymysql",
+            username=self.DB_USER,
+            password=self.DB_PASSWORD,
+            host=host,
+            port=int(port),
+            database=database
+        )
 
 
 settings = Settings()
