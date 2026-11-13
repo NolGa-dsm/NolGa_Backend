@@ -11,7 +11,7 @@ class Base(DeclarativeBase):
 
 
 def _connect_args() -> dict:
-    if settings.DATABASE_URL.startswith("sqlite"):
+    if settings.DATABASE_URL.drivername.startswith("sqlite"):
         return {"check_same_thread": False}
     return {}
 
