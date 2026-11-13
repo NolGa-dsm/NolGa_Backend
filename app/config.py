@@ -40,6 +40,16 @@ class Settings(BaseSettings):
         print("DB PORT:", repr(port))
         print("DB NAME:", repr(database))
 
+        
+        print("URL", repr(URL.create(
+            drivername="mysql+pymysql",
+            username=self.DB_USER,
+            password=self.DB_PASSWORD,
+            host=host,
+            port=int(port),
+            database=database
+        )))
+        
         return URL.create(
             drivername="mysql+pymysql",
             username=self.DB_USER,
