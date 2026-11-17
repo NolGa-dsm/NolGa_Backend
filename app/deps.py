@@ -35,7 +35,7 @@ def _user_from_access_token(db: Session, token: str) -> User:
 
 
 def _user_from_api_key(db: Session, api_key: str) -> User:
-    parts = api_key.split("_")
+    parts = api_key.split("_",2)
     if len(parts) != 3 or parts[0] != settings.API_KEY_PREFIX:
         raise invalid_credentials
 

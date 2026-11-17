@@ -75,7 +75,7 @@ def verify_api_key(
 ) -> ApiKeyVerifyResponse:
     if not api_key:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="X-API-Key header required")
-    parts = api_key.split("_")
+    parts = api_key.split("_",2)
     if len(parts) != 3 or parts[0] != settings.API_KEY_PREFIX:
         raise invalid_credentials
     record = db.scalar(select(ApiKey).where(ApiKey.key_prefix == parts[1]))
@@ -94,7 +94,7 @@ def verify_key(request: Request, db: Session = Depends(get_db)):
     key = request.headers.get("x-api-key") or request.headers.get("X-API-Key")
     if not key:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="X-API-Key header required")
-    parts = key.split("_")
+    parts = key.split("_",2)
     if len(parts) != 3 or parts[0] != settings.API_KEY_PREFIX:
         raise invalid_credentials
     record = db.scalar(select(ApiKey).where(ApiKey.key_prefix == parts[1]))
