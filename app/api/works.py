@@ -27,7 +27,7 @@ VALID_STATUSES = {"auto", "review", "edited"}
 _MAX_ID = 2**63 - 1
 _MAX_ID_STR = str(_MAX_ID)
 
-def _get_work(db: Session, work_id: str) -> Works:
+def _get_work(db: Session, work_id: str, username: str | None = None) -> Works:
     record = None
 
     if work_id.isascii() and work_id.isdigit():
@@ -41,10 +41,12 @@ def _get_work(db: Session, work_id: str) -> Works:
                 and normalized_id <= _MAX_ID_STR
             )
         ):
+            stmt = select(Works).where(Works.id == int(normalized_id))
+            if username is not None:
+                stmt = stmt.where(Works.author == username)
+
             record = db.scalar(
-                select(Works)
-                .where(Works.id == int(normalized_id))
-                .options(
+                stmt.options(
                     selectinload(Works.changes),
                     selectinload(Works.sources),
                 )
@@ -114,7 +116,7 @@ def create_work(
     db.commit()
 
     # 5. 생성된 작업의 ID를 포함한 상세 정보 반환
-    return _get_work(db, str(work.id))
+    return _get_work(db, str(work.id), current_user.username)
 
 @router.get(
     "",
@@ -124,6 +126,7 @@ def create_work(
 )
 def read_works(
     response: Response,
+    current_user=Depends(get_current_user_or_api_key),
     page: int | None = Query(None, ge=1, description="페이지 번호"),
     size: int | None = Query(None, ge=1, le=100, description="페이지당 개수"),
     repository: str | None = Query(
@@ -168,7 +171,15 @@ def read_works(
             detail="created_from must be before or equal to created_to",
         )
 
-    stmt = select(Works)
+    username = getattr(current_user, "username", None)
+    if not username:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="User authentication is required",
+        )
+
+    # 작업 목록은 인증된 사용자가 작성한 항목만 조회한다.
+    stmt = select(Works).where(Works.author == username)
 
     if created_from:
         start_datetime = datetime.combine(created_from, time.min)
@@ -250,9 +261,14 @@ def read_my_works(
 )
 def read_work(
     work_id: str,
+    current_user=Depends(get_current_user_or_api_key),
     db: Session = Depends(get_db),
 ):
-    return _get_work(db, work_id=work_id)
+    return _get_work(
+        db,
+        work_id=work_id,
+        username=current_user.username,
+    )
 
 @router.patch(
     "/{work_id}",
@@ -263,9 +279,14 @@ def read_work(
 def update_work_summary(
     work_id: str,
     body: WorkSummaryUpdate,
+    current_user=Depends(get_current_user_or_api_key),
     db: Session = Depends(get_db),
 ):
-    record = _get_work(db, work_id=work_id)
+    record = _get_work(
+        db,
+        work_id=work_id,
+        username=current_user.username,
+    )
     if not body.summary.strip():
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -277,4 +298,8 @@ def update_work_summary(
     db.commit()
 
     # 관계 데이터까지 포함하여 상세 정보 재조회
-    return _get_work(db, work_id=work_id)
+    return _get_work(
+        db,
+        work_id=work_id,
+        username=current_user.username,
+    )
