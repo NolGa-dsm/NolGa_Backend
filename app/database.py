@@ -15,7 +15,7 @@ def _connect_args() -> dict:
         return {"check_same_thread": False}
     return {}
 
-engine = create_engine(settings.DATABASE_URL, connect_args=_connect_args())
+engine = create_engine(settings.DATABASE_URL, connect_args=_connect_args(), pool_pre_ping=True)
 
 SessionLocal = sessionmaker(bind=engine, autoflush=False, autocommit=False)
 
